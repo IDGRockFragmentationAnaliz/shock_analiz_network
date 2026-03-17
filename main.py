@@ -2,33 +2,23 @@ import h5py
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
-
-def load_mat73_file(filepath):
-    """Загрузка MATLAB v7.3 файла"""
-    with h5py.File(filepath, 'r') as f:
-        data_dict = {}
-
-        def get_data(name, obj):
-            if isinstance(obj, h5py.Dataset):
-                # Загружаем данные и транспонируем для соответствия MATLAB
-                data = obj[()]
-                if len(data.shape) > 1:
-                    data = data.T
-                data_dict[name] = data
-
-        f.visititems(get_data)
-        return data_dict
-
+from multiprocessing import shared_memory
 
 def main():
-    path = Path("/media/koladik/HardDisk/data_rama/2025-12-23/mat")
-    name = "Displace-X1.mat"
-    path_file = path / name
+    # Подключаемся к shared memory блокам
+    print("Подключение к shared memory блокам...")
+    existing_shm_t = shared_memory.SharedMemory(name='my_t_data')
+    existing_shm_x = shared_memory.SharedMemory(name='my_x_data')
 
-    dict = load_mat73_file(path_file)
-    print(dict.keys())
-    t = dict['D1/T']
-    x = dict['D1/X']
+    print(f"✅ Подключились к блокам")
+    print(f"   Размер блока t: {existing_shm_t.size} байт")
+    print(f"   Размер блока x: {existing_shm_x.size} байт")
+
+    # ВАЖНО: Создаем numpy массивы из shared memory
+    # Форма (1, 5309182) как в loader.py
+    t = np.ndarray((1, 5309182), dtype=np.float64, buffer=existing_shm_t.buf)
+    x = np.ndarray((1, 5309182), dtype=np.float64, buffer=existing_shm_x.buf)
+
 
     # Создание фигуры и подграфика
     fig = plt.figure(figsize=(10, 6))
@@ -46,6 +36,22 @@ def main():
     # Отображение графика
     plt.tight_layout()
     plt.show()
+
+def load_mat73_file(filepath):
+    """Загрузка MATLAB v7.3 файла"""
+    with h5py.File(filepath, 'r') as f:
+        data_dict = {}
+
+        def get_data(name, obj):
+            if isinstance(obj, h5py.Dataset):
+                # Загружаем данные и транспонируем для соответствия MATLAB
+                data = obj[()]
+                if len(data.shape) > 1:
+                    data = data.T
+                data_dict[name] = data
+
+        f.visititems(get_data)
+        return data_dict
 
 
 if __name__ == "__main__":
